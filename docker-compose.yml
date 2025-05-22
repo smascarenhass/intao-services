@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    ports:
+      - "8003:8000"
+    environment:
+      - REDIS_URL=redis://database.intao.app:6379
+    volumes:
+      - .:/app
+    networks:
+      - intao-network
+
+networks:
+  intao-network:
+    driver: bridge 
