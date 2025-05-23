@@ -1,7 +1,7 @@
 import requests
 import os
 from typing import Optional, List, Dict
-from ..models.teams import GitChangeNotification
+from ..models.teams import TeamsNotification, GitChangeNotification
 
 class TeamsService:
     def __init__(self):
@@ -10,14 +10,14 @@ class TeamsService:
         
     def send_notification(self, webhook_url: str, message: str) -> bool:
         """
-        Sends notification to Microsoft Teams
+        Send a notification to Microsoft Teams
         
         Args:
             webhook_url: Teams webhook URL
-            message: Message to be sent
+            message: Message to send
             
         Returns:
-            bool: True if sent successfully, False otherwise
+            bool: True if successful, False otherwise
         """
         if self.env == 'DEV':
             print(f"[DEV MODE] Teams message suppressed: {message}")
@@ -37,27 +37,42 @@ class TeamsService:
         try:
             response = requests.post(webhook_url, json=payload, headers=headers)
             return response.status_code == 200
-        except requests.RequestException:
+        except Exception as e:
+            print(f"Error sending Teams notification: {str(e)}")
             return False
 
     def send_git_changes(self, changes: GitChangeNotification) -> bool:
         """
-        Sends Git changes notification to Microsoft Teams
+        Send Git changes notification to Microsoft Teams
         
         Args:
-            changes: GitChangeNotification object with change information
+            changes: GitChangeNotification object containing repository, branch, commits, and author information
             
         Returns:
-            bool: True if sent successfully, False otherwise
+            bool: True if successful, False otherwise
         """
-        if not self.git_webhook_url:
-            print("[ERROR] TEAMS_GIT_CHANEL not configured")
+        if not changes.webhook_url:
+            print("No webhook URL provided for Teams notification")
             return False
-
-        # Format message for Teams
-        message = self._format_git_message(changes)
-        
-        return self.send_notification(self.git_webhook_url, message)
+            
+        try:
+            # Formata a mensagem com os commits
+            message = f"## 🚀 New changes in {changes.repository}\n\n"
+            message += f"**Branch:** {changes.branch}\n"
+            message += f"**Author:** {changes.author}\n"
+            message += f"**Action:** {changes.action}\n\n"
+            
+            if changes.commits:
+                message += "### 📝 Commits:\n\n"
+                for commit in changes.commits:
+                    message += f"- {commit['message']} ({commit['id'][:7]})\n"
+            
+            message += f"\n[View changes]({changes.compare_url})"
+            
+            return self.send_notification(str(changes.webhook_url), message)
+        except Exception as e:
+            print(f"Error sending Git changes notification: {str(e)}")
+            return False
 
     def _format_git_message(self, changes: GitChangeNotification) -> str:
         """
