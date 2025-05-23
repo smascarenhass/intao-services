@@ -47,6 +47,12 @@ ssh "$REMOTE_USER@$REMOTE_HOST" "cd $REMOTE_DIR && \
 # Check if SSH commands were successful
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Deployment completed successfully!${NC}"
+    
+    # Send Teams notification if script exists
+    if [ -f "scripts/notify-teams.sh" ]; then
+        echo -e "${GREEN}Sending Teams notification...${NC}"
+        bash scripts/notify-teams.sh
+    fi
 else
     echo -e "${RED}Failed to restart services${NC}"
     exit 1
