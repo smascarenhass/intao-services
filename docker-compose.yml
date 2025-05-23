@@ -9,8 +9,11 @@ services:
       - "8003:8000"
     environment:
       - REDIS_URL=redis://database.intao.app:6379
+      - ENVIRONMENT=PROD
+      - TEAMS_GIT_CHANEL=${TEAMS_GIT_CHANEL}
     volumes:
-      - .:/app
+      - ./api:/app/api:delegated
+      - ./requirements.txt:/app/requirements.txt:delegated
     networks:
       - intao-network
 

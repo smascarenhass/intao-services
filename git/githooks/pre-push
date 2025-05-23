@@ -1,0 +1,13 @@
+#!/bin/bash
+
+echo "🚀 Running deploy.sh before push..."
+
+./deploy.sh
+
+if [ $? -ne 0 ]; then
+  echo "❌ Deployment failed. Aborting push."
+  exit 1
+fi
+
+echo "✅ Deployment successful. Proceeding with push..."
+exit 0
