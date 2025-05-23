@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Configuration
-TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-""}
+API_URL="https://internal.intao.app/api/services/teams/send-message/git"
 REPO_NAME=$(basename $(git rev-parse --show-toplevel))
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 COMMIT_HASH=$(git rev-parse HEAD)
@@ -21,26 +21,24 @@ if [ "$BRANCH" != "main" ]; then
     exit 0
 fi
 
-# Check if webhook URL is set
-if [ -z "$TEAMS_WEBHOOK_URL" ]; then
-    echo -e "${YELLOW}TEAMS_WEBHOOK_URL not set, skipping Teams notification${NC}"
-    exit 0
-fi
-
-# Prepare the message
-MESSAGE="## 🚀 New changes in $REPO_NAME\n\n"
-MESSAGE+="**Branch:** $BRANCH\n"
-MESSAGE+="**Author:** $AUTHOR\n"
-MESSAGE+="**Action:** push\n\n"
-MESSAGE+="### 📝 Commit:\n\n"
-MESSAGE+="- $COMMIT_MSG ($COMMIT_HASH)\n\n"
-MESSAGE+="[View changes]($COMPARE_URL)"
+# Prepare the payload
+PAYLOAD="{
+    \"repository\": \"$REPO_NAME\",
+    \"branch\": \"$BRANCH\",
+    \"commits\": [{
+        \"id\": \"$COMMIT_HASH\",
+        \"message\": \"$COMMIT_MSG\"
+    }],
+    \"author\": \"$AUTHOR\",
+    \"compare_url\": \"$COMPARE_URL\",
+    \"action\": \"push\"
+}"
 
 # Send notification to Teams
 echo -e "${GREEN}Sending notification to Teams...${NC}"
 curl -H "Content-Type: application/json" \
-     -d "{\"text\": \"$MESSAGE\"}" \
-     "$TEAMS_WEBHOOK_URL"
+     -d "$PAYLOAD" \
+     "$API_URL"
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}Teams notification sent successfully!${NC}"
