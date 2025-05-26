@@ -1,10 +1,5 @@
 #!/bin/bash
 
-ENV_PATH="git/config/.env"
-if [ -f "$ENV_PATH" ]; then
-    source "$ENV_PATH"
-fi
-
 # Configuration
 REMOTE_USER="intao"
 REMOTE_HOST="internal.intao.app"

@@ -11,6 +11,10 @@ services:
       - REDIS_URL=redis://database.intao.app:6379
       - ENVIRONMENT=PROD
       - TEAMS_GIT_CHANEL=${TEAMS_GIT_CHANEL}
+      - DB_USER=unfbrbzgfgscg
+      - DB_PASSWORD=meut1tbd0twk
+      - DB_HOST=gfram1000.siteground.biz
+      - DB_NAME=dblbufwzxkgog9
     volumes:
       - ./api:/app/api:delegated
       - ./requirements.txt:/app/requirements.txt:delegated

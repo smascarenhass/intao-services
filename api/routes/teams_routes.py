@@ -44,7 +44,12 @@ async def send_git_notification(changes: GitChangeNotification):
         dict: Status of the notification
     """
     teams_service = TeamsService()
+    print('1')
+    # Se quiser forçar uma URL mockada, basta sobrescrever o campo:
+    changes.webhook_url = "https://intaoleaders.webhook.office.com/webhookb2/c2a42877-ee61-4f3f-9f58-c739de81ef2b@2e65c0c9-93de-4e58-9cd6-5a4a42165780/IncomingWebhook/9dc613d545394d1bb70444657dc96c39/cea37b56-6d79-42ef-a4d2-56112b107bdf/V2ylDIkOiCdxRp_R3GUuxgbpAExHfSPAWVvtQdvHaLlB81"
     success = teams_service.send_git_changes(changes)
+
+    print('2')
     
     if success:
         return {"status": "success", "message": "Git changes notification sent successfully"}

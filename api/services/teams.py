@@ -51,24 +51,31 @@ class TeamsService:
         Returns:
             bool: True if successful, False otherwise
         """
-        if not changes.webhook_url:
+        print('3')
+        if not changes.webhook_url and not self.git_webhook_url:
             print("No webhook URL provided for Teams notification")
             return False
+        webhook_url = changes.webhook_url or self.git_webhook_url
+        changes.webhook_url = webhook_url
+        print('4')
             
         try:
+
             # Formata a mensagem com os commits
             message = f"## 🚀 New changes in {changes.repository}\n\n"
             message += f"**Branch:** {changes.branch}\n"
             message += f"**Author:** {changes.author}\n"
             message += f"**Action:** {changes.action}\n\n"
             
+
             if changes.commits:
+                print('5')
                 message += "### 📝 Commits:\n\n"
                 for commit in changes.commits:
                     message += f"- {commit['message']} ({commit['id'][:7]})\n"
-            
+
             message += f"\n[View changes]({changes.compare_url})"
-            
+            print('6')
             return self.send_notification(str(changes.webhook_url), message)
         except Exception as e:
             print(f"Error sending Git changes notification: {str(e)}")
