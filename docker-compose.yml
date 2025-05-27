@@ -20,6 +20,25 @@ services:
       - ./requirements.txt:/app/requirements.txt:delegated
     networks:
       - intao-network
+    depends_on:
+      - services-manager
+
+  services-manager:
+    build:
+      context: .
+      dockerfile: services/Dockerfile
+    environment:
+      - ENVIRONMENT=PROD
+      - DB_USER=unfbrbzgfgscg
+      - DB_PASSWORD=meut1tbd0twk
+      - DB_HOST=gfram1000.siteground.biz
+      - DB_NAME=dblbufwzxkgog9
+    volumes:
+      - ./services:/app/services:delegated
+      - ./requirements.txt:/app/requirements.txt:delegated
+    networks:
+      - intao-network
+    restart: unless-stopped
 
 networks:
   intao-network:
