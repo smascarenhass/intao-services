@@ -27,7 +27,7 @@ async def get_membership_users(
     db: Session = Depends(get_db)
 ):
     """
-    Retorna todos os usuários do Membership Pro
+    Returns all Membership Pro users
     """
     try:
         users = await MembershipProService.list_users(db)
@@ -38,7 +38,7 @@ async def get_membership_users(
             for user in users
         ]
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao buscar usuários: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching users: {str(e)}")
 
 @router.get("/users/{user_id}")
 async def get_membership_user(
@@ -47,23 +47,23 @@ async def get_membership_user(
     db: Session = Depends(get_db)
 ):
     """
-    Retorna detalhes de um usuário específico do Membership Pro
+    Returns details of a specific Membership Pro user
     """
     try:
         user = await MembershipProService.get_user_by_id(db, user_id)
         if not user:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+            raise HTTPException(status_code=404, detail="User not found")
             
         return {
             "user_id": user.ID,
             "user_email": user.user_email,
             "display_name": user.display_name,
             "user_registered": user.user_registered,
-            "status": "active",  # Você pode adicionar lógica para determinar o status
-            "plan": "pro"  # Você pode adicionar lógica para determinar o plano
+            "status": "active",  # You can add logic to determine status
+            "plan": "pro"  # You can add logic to determine plan
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao buscar usuário: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching user: {str(e)}")
 
 @router.post("/users/{user_id}/activate")
 async def activate_membership(
@@ -72,16 +72,16 @@ async def activate_membership(
     db: Session = Depends(get_db)
 ):
     """
-    Ativa o membership pro para um usuário
+    Activates membership pro for a user
     """
     try:
         success = await MembershipProService.update_user_status(db, user_id, "active")
         if not success:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+            raise HTTPException(status_code=404, detail="User not found")
             
-        return {"message": "Membership Pro ativado com sucesso"}
+        return {"message": "Membership Pro activated successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao ativar membership: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error activating membership: {str(e)}")
 
 @router.post("/users/{user_id}/deactivate")
 async def deactivate_membership(
@@ -90,16 +90,16 @@ async def deactivate_membership(
     db: Session = Depends(get_db)
 ):
     """
-    Desativa o membership pro para um usuário
+    Deactivates membership pro for a user
     """
     try:
         success = await MembershipProService.update_user_status(db, user_id, "inactive")
         if not success:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+            raise HTTPException(status_code=404, detail="User not found")
             
-        return {"message": "Membership Pro desativado com sucesso"}
+        return {"message": "Membership Pro deactivated successfully"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao desativar membership: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error deactivating membership: {str(e)}")
 
 @router.get("/status/{user_id}")
 async def get_membership_status(
@@ -108,22 +108,22 @@ async def get_membership_status(
     db: Session = Depends(get_db)
 ):
     """
-    Verifica o status do membership pro de um usuário
+    Checks membership pro status for a user
     """
     try:
         user = await MembershipProService.get_user_by_id(db, user_id)
         if not user:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado")
+            raise HTTPException(status_code=404, detail="User not found")
             
         return {
             "user_id": user.ID,
             "user_email": user.user_email,
-            "status": "active",  # Você pode adicionar lógica para determinar o status
-            "plan": "pro",  # Você pode adicionar lógica para determinar o plano
+            "status": "active",  # You can add logic to determine status
+            "plan": "pro",  # You can add logic to determine plan
             "last_updated": datetime.now()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao verificar status do membership: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error checking membership status: {str(e)}")
 
 @router.post("/users")
 async def add_membership_user(
@@ -134,4 +134,4 @@ async def add_membership_user(
         new_user = await MembershipProService.add_user(db, user)
         return {"user": new_user}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao adicionar usuário: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Error adding user: {str(e)}")
