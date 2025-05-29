@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   api:
     build:
@@ -26,7 +24,7 @@ services:
   services-manager:
     build:
       context: .
-      dockerfile: services/Dockerfile
+      dockerfile: routines/Dockerfile
     environment:
       - ENVIRONMENT=PROD
       - DB_USER=unfbrbzgfgscg
@@ -34,7 +32,7 @@ services:
       - DB_HOST=gfram1000.siteground.biz
       - DB_NAME=dblbufwzxkgog9
     volumes:
-      - ./services:/app/services:delegated
+      - ./routines:/app/routines:delegated
       - ./requirements.txt:/app/requirements.txt:delegated
     networks:
       - intao-network

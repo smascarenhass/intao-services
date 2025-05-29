@@ -1,5 +1,5 @@
 from service_manager import ServiceManager
-from membership_monitor import monitor_membership_users
+from workers.sync_sparks_app_passwords import sync_sparks_app_passwords
 import time
 import os
 import logging
@@ -15,11 +15,11 @@ def main():
     # Criando uma instância do gerenciador de serviços
     manager = ServiceManager()
 
-    # Monitoramento de usuários do Membership Pro a cada 30 minutos
+    # Sync Membership Database a cada 20 segundos
     manager.add_service(
-        name="membership_monitor",
-        function=monitor_membership_users,
-        interval=5  # 1800 segundos = 30 minutos
+        name="sync_sparks_app_passwords",
+        function=sync_sparks_app_passwords,
+        interval=20  # 20 segundos
     )
 
     # Iniciando o gerenciador de serviços
