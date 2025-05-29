@@ -42,17 +42,42 @@ async def sync_sparks_app_passwords():
             membership_logger.info("=== MEMBERSHIP USERS START ===")
             membership_users = await membership_service.list_users(db)
             membership_logger.info(f"Total Membership users: {len(membership_users)}")
-            for user in membership_users:
-                membership_logger.info(f"Membership User: {user.display_name} ({user.user_email})")
-            membership_logger.info("=== MEMBERSHIP USERS END ===\n")
-
+            
+            # Create a dictionary of membership users by email
+            membership_users_dict = {user.user_email.lower(): user for user in membership_users}
+            
             # Fetch Sparks App users
             sparks_logger.info("=== SPARKS USERS START ===")
             sparks_users = await sparks_service.get_users()
             sparks_logger.info(f"Total Sparks users: {len(sparks_users)}")
-            for user in sparks_users:
-                sparks_logger.info(f"Sparks User: {user.get('display_name', 'N/A')} ({user.get('email', 'N/A')}) - App Password: {user.get('app_password', 'N/A')}")
-            sparks_logger.info("=== SPARKS USERS END ===\n")
+            
+            # Find matching users
+            matching_users = []
+            for sparks_user in sparks_users:
+                sparks_email = sparks_user.get('email', '').lower()
+                if sparks_email in membership_users_dict:
+                    membership_user = membership_users_dict[sparks_email]
+                    matching_users.append({
+                        'email': sparks_email,
+                        'display_name': membership_user.display_name,
+                        'membership_id': membership_user.ID,
+                        'app_password': sparks_user.get('app_password', 'N/A'),
+                        'membership_status': membership_user.user_status
+                    })
+            
+            # Log matching users
+            main_logger.info("=== MATCHING USERS START ===")
+            main_logger.info(f"Total matching users: {len(matching_users)}")
+            for user in matching_users:
+                main_logger.info(f"""
+                User: {user['display_name']}
+                Email: {user['email']}
+                Membership ID: {user['membership_id']}
+                App Password: {user['app_password']}
+                Status: {user['membership_status']}
+                ------------------------
+                """)
+            main_logger.info("=== MATCHING USERS END ===\n")
 
         finally:
             db.close()
@@ -65,7 +90,7 @@ async def sync_sparks_app_passwords():
         raise
 
 if __name__ == "__main__":
-    asyncio.run(sync_membership_database())
+    asyncio.run(sync_sparks_app_passwords())
 
 def get_last_sync_time():
     """Returns the timestamp of the last synchronization"""
