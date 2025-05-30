@@ -11,6 +11,7 @@ sys.path.append(project_root)
 from api.services.database import SessionLocal
 from api.services.membership_pro import MembershipProService
 from routines.services.sparks_app import SparksAppService
+from sqlalchemy import text
 
 # Logging configuration
 logging.basicConfig(
@@ -25,12 +26,12 @@ main_logger = logging.getLogger('sync_service')
 
 async def sync_sparks_app_passwords():
     """
-    Service that synchronizes the members database.
-    Performs synchronization between local and remote databases.
+    Service that synchronizes passwords from Membership Pro to Sparks App.
+    Makes sure users that exist in both systems have the same password as in Membership Pro.
     """
     try:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        main_logger.info(f"Starting members database synchronization at {current_time}")
+        main_logger.info(f"Starting password synchronization at {current_time}")
 
         # Initialize services
         db = SessionLocal()
@@ -48,45 +49,83 @@ async def sync_sparks_app_passwords():
             
             # Fetch Sparks App users
             sparks_logger.info("=== SPARKS USERS START ===")
-            sparks_users = await sparks_service.get_users()
+            sparks_users = sparks_service.get_sparks_users()
             sparks_logger.info(f"Total Sparks users: {len(sparks_users)}")
             
-            # Find matching users
-            matching_users = []
+            # Track synchronization statistics
+            total_matches = 0
+            updated_sparks = 0
+            errors = 0
+            
+            # Process matching users
             for sparks_user in sparks_users:
                 sparks_email = sparks_user.get('email', '').lower()
                 if sparks_email in membership_users_dict:
+                    total_matches += 1
                     membership_user = membership_users_dict[sparks_email]
-                    matching_users.append({
-                        'email': sparks_email,
-                        'display_name': membership_user.display_name,
-                        'membership_id': membership_user.ID,
-                        'app_password': sparks_user.get('app_password', 'N/A'),
-                        'membership_status': membership_user.user_status
-                    })
+                    
+                    try:
+                        # Get current passwords
+                        membership_pass = membership_user.user_pass
+                        sparks_pass = sparks_user.get('password', 'N/A')
+                        
+                        # If passwords are different, update Sparks password
+                        if sparks_pass != membership_pass:
+                            try:
+                                # Truncate password to 60 characters to match database field size
+                                truncated_password = membership_pass[:60]
+                                
+                                # Update password in Sparks App database
+                                query = text("""
+                                    UPDATE users 
+                                    SET password = :password 
+                                    WHERE email = :email
+                                """)
+                                sparks_service.sparks_session.execute(
+                                    query, 
+                                    {
+                                        "password": truncated_password,
+                                        "email": sparks_email
+                                    }
+                                )
+                                sparks_service.sparks_session.commit()
+                                
+                                updated_sparks += 1
+                                sparks_logger.info(f"Updated Sparks password for user: {sparks_email}")
+                            except Exception as e:
+                                sparks_service.sparks_session.rollback()
+                                errors += 1
+                                sparks_logger.error(f"Failed to update Sparks password for user {sparks_email}: {str(e)}")
+                    
+                    except Exception as e:
+                        errors += 1
+                        main_logger.error(f"Error processing user {sparks_email}: {str(e)}")
+
+            # Print summary
+            main_logger.info("\n" + "="*80)
+            main_logger.info("PASSWORD SYNCHRONIZATION SUMMARY")
+            main_logger.info("="*80)
             
-            # Log matching users
-            main_logger.info("=== MATCHING USERS START ===")
-            main_logger.info(f"Total matching users: {len(matching_users)}")
-            for user in matching_users:
-                main_logger.info(f"""
-                User: {user['display_name']}
-                Email: {user['email']}
-                Membership ID: {user['membership_id']}
-                App Password: {user['app_password']}
-                Status: {user['membership_status']}
-                ------------------------
-                """)
-            main_logger.info("=== MATCHING USERS END ===\n")
+            # Overall statistics
+            main_logger.info("\n📊 OVERALL STATISTICS:")
+            main_logger.info(f"Total Membership users: {len(membership_users)}")
+            main_logger.info(f"Total Sparks users: {len(sparks_users)}")
+            main_logger.info(f"Total matching users: {total_matches}")
+            main_logger.info(f"Updated Sparks passwords: {updated_sparks}")
+            main_logger.info(f"Errors during sync: {errors}")
+            
+            main_logger.info("\n" + "="*80)
+            main_logger.info("SYNCHRONIZATION COMPLETED")
+            main_logger.info("="*80 + "\n")
 
         finally:
             db.close()
 
         # Log successful operation
-        main_logger.info("Members database synchronization completed successfully")
+        main_logger.info("Password synchronization completed successfully")
         
     except Exception as e:
-        main_logger.error(f"Error during members database synchronization: {str(e)}")
+        main_logger.error(f"Error during password synchronization: {str(e)}")
         raise
 
 if __name__ == "__main__":
