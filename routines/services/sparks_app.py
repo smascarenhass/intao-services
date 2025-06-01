@@ -6,7 +6,7 @@ logger = logging.getLogger(__name__)
 
 class SparksAppService:
     def __init__(self):
-        self.api_url = "https://internal.intao.app/api/cockpit/spark-app/users"
+        self.api_url = "https://internal.intao.app/api/cockpit/sparks-app/users"
         
     async def get_users(self):
         """Get all users from Sparks App API"""
