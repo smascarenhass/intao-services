@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Dict
+from typing import List, Dict, Any
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 from api.models.user import User
@@ -15,46 +15,75 @@ class SparksAppService:
         # Configuração do banco de dados do Membership
         self.membership_db = SessionLocal()
         
-    def __del__(self):
-        self.sparks_session.close()
-        self.membership_db.close()
-
-    def alter_password_field_size(self) -> bool:
-        """
-        Altera o tamanho do campo password na tabela users para acomodar senhas mais longas
+        # Configuração do banco de dados do Sparks App (PostgreSQL)
+        sparks_db_url = "postgresql://tsdb:mkTaAhqyjUDp8W4LAgvZcLZsY2cFDa8c@database.intao.app:5432/tshaped"
+        self.sparks_engine = create_engine(sparks_db_url, echo=False)  # Disable SQL query logging
+        self.sparks_session = Session(self.sparks_engine)
         
-        Returns:
-            bool: True se a alteração foi bem sucedida, False caso contrário
+        # Garante que a coluna last_password_sync existe
+        self._ensure_sync_column_exists()
+        
+    def _ensure_sync_column_exists(self):
+        """
+        Garante que a coluna last_password_sync existe na tabela users.
+        Se não existir, cria a coluna.
         """
         try:
-            # Primeiro, verifica o tamanho atual do campo
+            # Verifica se a coluna existe
             check_query = text("""
-                SELECT character_maximum_length 
+                SELECT column_name 
                 FROM information_schema.columns 
                 WHERE table_name = 'users' 
-                AND column_name = 'password'
+                AND column_name = 'last_password_sync'
             """)
-            result = self.sparks_session.execute(check_query).scalar()
             
-            if result and result < 255:
-                # Altera o tamanho do campo para 255 caracteres
-                alter_query = text("""
+            result = self.sparks_session.execute(check_query).fetchone()
+            
+            if not result:
+                # Se a coluna não existe, cria ela
+                create_query = text("""
                     ALTER TABLE users 
-                    ALTER COLUMN password TYPE varchar(255)
+                    ADD COLUMN last_password_sync TIMESTAMP
                 """)
-                self.sparks_session.execute(alter_query)
+                self.sparks_session.execute(create_query)
                 self.sparks_session.commit()
-                logger.info("Successfully altered password field size to 255 characters")
-                return True
+                logger.info("Coluna last_password_sync criada com sucesso")
             else:
-                logger.info("Password field is already large enough")
-                return True
+                logger.info("Coluna last_password_sync já existe")
                 
         except Exception as e:
-            self.sparks_session.rollback()
-            logger.error(f"Error altering password field size: {str(e)}")
-            return False
+            logger.error(f"Erro ao verificar/criar coluna last_password_sync: {str(e)}")
+            raise
+
+    def _normalize_password(self, password: str) -> str:
+        """
+        Normaliza a senha para comparação, removendo espaços em branco
+        e truncando para o tamanho máximo do banco de dados.
+        """
+        if not password:
+            return ""
+        return password.strip()[:60]
+
+    def _passwords_match(self, membership_pass: str, sparks_pass: str) -> bool:
+        """
+        Compara as senhas de forma normalizada.
+        """
+        normalized_membership = self._normalize_password(membership_pass)
+        normalized_sparks = self._normalize_password(sparks_pass)
         
+        # Log para debug
+        logger.debug(f"Comparando senhas:")
+        logger.debug(f"Membership (normalizada): {normalized_membership[:10]}...")
+        logger.debug(f"Sparks (normalizada): {normalized_sparks[:10]}...")
+        
+        return normalized_membership == normalized_sparks
+        
+    def __del__(self):
+        if hasattr(self, 'sparks_session'):
+            self.sparks_session.close()
+        if hasattr(self, 'membership_db'):
+            self.membership_db.close()
+
     def get_sparks_users(self) -> List[Dict]:
         """
         Get all users from Sparks App database
@@ -63,18 +92,24 @@ class SparksAppService:
             List[Dict]: List of users with their details
         """
         try:
+            logger.info("Executing query to get all users from Sparks App database...")
             query = text("""
-                SELECT id, email, password 
+                SELECT id, email, password, last_password_sync
                 FROM users 
                 WHERE email IS NOT NULL
             """)
+            print("\n=== QUERY EXECUTADA ===")
+            print(query.text)
+            print("======================\n")
+            
             result = self.sparks_session.execute(query)
             users = []
             for row in result:
                 users.append({
                     'id': row[0],
                     'email': row[1].lower() if row[1] else None,  # Normaliza email para lowercase
-                    'password': row[2]
+                    'password': row[2],
+                    'last_password_sync': row[3]
                 })
             logger.info(f"Successfully retrieved {len(users)} users from Sparks App database")
             return users
@@ -82,72 +117,106 @@ class SparksAppService:
             logger.error(f"Error fetching users from Sparks App database: {str(e)}", exc_info=True)
             raise
 
-    def sync_passwords(self) -> Dict[str, int]:
+    def sync_passwords(self, membership_users: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
-        Sync passwords from Membership Pro to Sparks App for matching users
-        
-        Returns:
-            Dict[str, int]: Statistics about the sync operation
+        Synchronizes passwords from Membership Pro to Sparks App.
+        Makes sure users that exist in both systems have the same password as in Membership Pro.
         """
-        stats = {
-            "total_membership_users": 0,
-            "total_sparks_users": 0,
-            "matching_users": 0,
-            "updated_passwords": 0,
-            "errors": 0
-        }
-        
         try:
-            # Primeiro, altera o tamanho do campo password se necessário
-            if not self.alter_password_field_size():
-                raise Exception("Failed to alter password field size")
+            # Get all users from Sparks App database
+            print("\n=== QUERY EXECUTADA ===\n")
+            query = text("""
+                SELECT id, email, password, last_password_sync
+                FROM users 
+                WHERE email IS NOT NULL
+            """)
+            print(query)
+            print("\n======================\n")
             
-            # Get all users from both systems
-            membership_users = self.membership_db.query(User).all()
-            sparks_users = self.get_sparks_users()
+            sparks_users = self.sparks_session.execute(query).fetchall()
+            print(f"Successfully retrieved {len(sparks_users)} users from Sparks App database")
             
-            stats["total_membership_users"] = len(membership_users)
-            stats["total_sparks_users"] = len(sparks_users)
+            # Track synchronization statistics
+            stats = {
+                'total_membership_users': len(membership_users),
+                'total_sparks_users': len(sparks_users),
+                'matching_users': 0,
+                'updated_passwords': 0,
+                'skipped_syncs': 0,
+                'errors': 0
+            }
             
-            # Create a map of email to Sparks user for faster lookup
-            sparks_user_map = {user["email"]: user for user in sparks_users if user["email"]}
-            
-            # For each membership user, try to update their Sparks password
+            # Process each membership user
             for membership_user in membership_users:
-                email = membership_user.user_email.lower()
-                if email in sparks_user_map:
-                    stats["matching_users"] += 1
-                    sparks_user = sparks_user_map[email]
+                membership_email = membership_user['email'].lower()
+                membership_pass = membership_user['password']
+                
+                # Find matching Sparks user
+                sparks_user = next((user for user in sparks_users if user.email.lower() == membership_email), None)
+                
+                if sparks_user:
+                    stats['matching_users'] += 1
                     
-                    # Check if passwords are different
-                    if sparks_user["password"] != membership_user.user_pass:
+                    print("\n" + "="*50)
+                    print(f"VERIFICANDO USUÁRIO: {membership_email}")
+                    print("="*50 + "\n")
+                    
+                    print(f"Senha do Membership: {membership_pass[:10]}...")
+                    print(f"Senha atual no banco: {sparks_user.password[:10]}...")
+                    
+                    # Verifica se a senha já foi sincronizada recentemente (últimas 24 horas)
+                    last_sync = sparks_user.last_password_sync
+                    if last_sync and (datetime.now() - last_sync).total_seconds() < 86400:  # 24 horas em segundos
+                        print("⏭️ SENHA SINCRONIZADA RECENTEMENTE - PULANDO ATUALIZAÇÃO")
+                        stats['skipped_syncs'] += 1
+                        continue
+                    
+                    # If passwords are different, update Sparks password
+                    if not self._passwords_match(membership_pass, sparks_user.password):
+                        print("\n🔄 SENHAS DIFERENTES - INICIANDO ATUALIZAÇÃO")
                         try:
+                            # Truncate password to 60 characters to match database field size
+                            truncated_password = self._normalize_password(membership_pass)
+                            
                             # Update password in Sparks App database
-                            query = text("""
+                            update_query = text("""
                                 UPDATE users 
-                                SET password = :password 
+                                SET password = :password,
+                                    last_password_sync = :sync_time
                                 WHERE email = :email
+                                RETURNING id, email, password, last_password_sync
                             """)
-                            self.sparks_session.execute(
-                                query, 
+                            
+                            result = self.sparks_session.execute(
+                                update_query, 
                                 {
-                                    "password": membership_user.user_pass,
-                                    "email": email
+                                    "password": truncated_password,
+                                    "email": membership_email,
+                                    "sync_time": datetime.now()
                                 }
                             )
-                            self.sparks_session.commit()
                             
-                            stats["updated_passwords"] += 1
-                            logger.info(f"Successfully synced password for user: {email}")
+                            # Verify the update
+                            updated_user = result.fetchone()
+                            if updated_user and self._passwords_match(truncated_password, updated_user.password):
+                                stats['updated_passwords'] += 1
+                                print(f"✅ Senha atualizada com sucesso para {membership_email}")
+                            else:
+                                stats['errors'] += 1
+                                print(f"❌ Erro ao verificar atualização para {membership_email}")
+                                
                         except Exception as e:
-                            self.sparks_session.rollback()
-                            stats["errors"] += 1
-                            logger.error(f"Failed to sync password for user {email}: {str(e)}")
+                            stats['errors'] += 1
+                            print(f"❌ Erro ao atualizar senha para {membership_email}: {str(e)}")
+                    else:
+                        print("✅ SENHAS IDÊNTICAS - PULANDO ATUALIZAÇÃO")
+                    
+                    print("="*50 + "\n")
             
             return stats
-                        
+            
         except Exception as e:
-            logger.error(f"Error during password sync: {str(e)}", exc_info=True)
+            print(f"Error during password synchronization: {str(e)}")
             raise
 
 # For backward compatibility

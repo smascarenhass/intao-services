@@ -15,11 +15,11 @@ def main():
     # Criando uma instância do gerenciador de serviços
     manager = ServiceManager()
 
-    # Sync Membership Database a cada 20 segundos
+    # Sync Membership Database a cada 1 hora
     manager.add_service(
         name="sync_sparks_app_passwords",
         function=sync_sparks_app_passwords,
-        interval=20  # 20 segundos
+        interval=3600  # 1 hora em segundos
     )
 
     # Iniciando o gerenciador de serviços
