@@ -6,7 +6,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/email", tags=["email"])
+router = APIRouter(prefix="/email", tags=["email"])
 
 class InvitationEmailRequest(BaseModel):
     to_email: EmailStr
