@@ -44,63 +44,18 @@ async def sync_sparks_app_passwords():
             membership_users = await membership_service.list_users(db)
             membership_logger.info(f"Total Membership users: {len(membership_users)}")
             
-            # Create a dictionary of membership users by email
-            membership_users_dict = {user.user_email.lower(): user for user in membership_users}
+            # Convert membership users to dictionary format
+            membership_users_dict = [
+                {
+                    "email": user.user_email.lower(),
+                    "password": user.user_pass
+                }
+                for user in membership_users
+            ]
             
-            # Fetch Sparks App users
-            sparks_logger.info("=== SPARKS USERS START ===")
-            sparks_users = sparks_service.get_sparks_users()
-            sparks_logger.info(f"Total Sparks users: {len(sparks_users)}")
+            # Use the sync_passwords method from SparksAppService
+            stats = sparks_service.sync_passwords(membership_users_dict)
             
-            # Track synchronization statistics
-            total_matches = 0
-            updated_sparks = 0
-            errors = 0
-            
-            # Process matching users
-            for sparks_user in sparks_users:
-                sparks_email = sparks_user.get('email', '').lower()
-                if sparks_email in membership_users_dict:
-                    total_matches += 1
-                    membership_user = membership_users_dict[sparks_email]
-                    
-                    try:
-                        # Get current passwords
-                        membership_pass = membership_user.user_pass
-                        sparks_pass = sparks_user.get('password', 'N/A')
-                        
-                        # If passwords are different, update Sparks password
-                        if sparks_pass != membership_pass:
-                            try:
-                                # Truncate password to 60 characters to match database field size
-                                truncated_password = membership_pass[:60]
-                                
-                                # Update password in Sparks App database
-                                query = text("""
-                                    UPDATE users 
-                                    SET password = :password 
-                                    WHERE email = :email
-                                """)
-                                sparks_service.sparks_session.execute(
-                                    query, 
-                                    {
-                                        "password": truncated_password,
-                                        "email": sparks_email
-                                    }
-                                )
-                                sparks_service.sparks_session.commit()
-                                
-                                updated_sparks += 1
-                                sparks_logger.info(f"Updated Sparks password for user: {sparks_email}")
-                            except Exception as e:
-                                sparks_service.sparks_session.rollback()
-                                errors += 1
-                                sparks_logger.error(f"Failed to update Sparks password for user {sparks_email}: {str(e)}")
-                    
-                    except Exception as e:
-                        errors += 1
-                        main_logger.error(f"Error processing user {sparks_email}: {str(e)}")
-
             # Print summary
             main_logger.info("\n" + "="*80)
             main_logger.info("PASSWORD SYNCHRONIZATION SUMMARY")
@@ -108,11 +63,11 @@ async def sync_sparks_app_passwords():
             
             # Overall statistics
             main_logger.info("\n📊 OVERALL STATISTICS:")
-            main_logger.info(f"Total Membership users: {len(membership_users)}")
-            main_logger.info(f"Total Sparks users: {len(sparks_users)}")
-            main_logger.info(f"Total matching users: {total_matches}")
-            main_logger.info(f"Updated Sparks passwords: {updated_sparks}")
-            main_logger.info(f"Errors during sync: {errors}")
+            main_logger.info(f"Total Membership users: {stats['total_membership_users']}")
+            main_logger.info(f"Total Sparks users: {stats['total_sparks_users']}")
+            main_logger.info(f"Total matching users: {stats['matching_users']}")
+            main_logger.info(f"Updated Sparks passwords: {stats['updated_passwords']}")
+            main_logger.info(f"Errors during sync: {stats['errors']}")
             
             main_logger.info("\n" + "="*80)
             main_logger.info("SYNCHRONIZATION COMPLETED")

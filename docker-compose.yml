@@ -46,4 +46,7 @@ services:
 
 networks:
   intao-network:
-    driver: bridge 
+    driver: bridge
+
+volumes:
+  postgres_data: 

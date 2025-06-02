@@ -7,7 +7,7 @@ from typing import Dict, Callable, Any
 import schedule
 import inspect
 
-# Configuração do logging
+# Logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -23,12 +23,12 @@ class ServiceManager:
 
     def add_service(self, name: str, function: Callable, interval: int):
         """
-        Adiciona um serviço ao gerenciador
+        Adds a service to the manager
         
         Args:
-            name: Nome do serviço
-            function: Função a ser executada
-            interval: Intervalo em segundos entre execuções
+            name: Service name
+            function: Function to be executed
+            interval: Interval in seconds between executions
         """
         self.services[name] = {
             'function': function,
@@ -36,22 +36,22 @@ class ServiceManager:
             'last_run': None,
             'is_async': inspect.iscoroutinefunction(function)
         }
-        logger.info(f"Serviço '{name}' adicionado com sucesso")
+        logger.info(f"Service '{name}' added successfully")
 
     def remove_service(self, name: str):
-        """Remove um serviço do gerenciador."""
+        """Removes a service from the manager."""
         if name in self.services:
             del self.services[name]
-            logger.info(f"Serviço '{name}' removido com sucesso")
+            logger.info(f"Service '{name}' removed successfully")
         else:
-            logger.warning(f"Serviço '{name}' não encontrado")
+            logger.warning(f"Service '{name}' not found")
 
     def _run_service(self, name: str):
-        """Executa um serviço específico em loop"""
+        """Executes a specific service in a loop"""
         service = self.services[name]
         
         if service['is_async']:
-            # Criar um novo event loop para esta thread
+            # Create a new event loop for this thread
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             self.loops[name] = loop
@@ -60,40 +60,40 @@ class ServiceManager:
             try:
                 current_time = datetime.now()
                 
-                # Verifica se é hora de executar o serviço
+                # Check if it's time to execute the service
                 if (service['last_run'] is None or 
                     (current_time - service['last_run']).total_seconds() >= service['interval']):
                     
-                    logger.info(f"Executando serviço '{name}'...")
+                    logger.info(f"Executing service '{name}'...")
                     
                     if service['is_async']:
-                        # Executa a função assíncrona
+                        # Execute the async function
                         loop = self.loops[name]
                         loop.run_until_complete(service['function']())
                     else:
-                        # Executa a função síncrona
+                        # Execute the sync function
                         service['function']()
                     
                     service['last_run'] = current_time
-                    logger.info(f"Serviço '{name}' executado com sucesso")
+                    logger.info(f"Service '{name}' executed successfully")
                 
-                # Aguarda um pouco antes de verificar novamente
+                # Wait a bit before checking again
                 time.sleep(1)
                 
             except Exception as e:
-                logger.error(f"Erro ao executar serviço '{name}': {str(e)}")
-                time.sleep(service['interval'])  # Aguarda o intervalo antes de tentar novamente
+                logger.error(f"Error executing service '{name}': {str(e)}")
+                time.sleep(service['interval'])  # Wait for the interval before trying again
 
     def start(self):
-        """Inicia todos os serviços"""
+        """Starts all services"""
         if self.running:
-            logger.warning("Gerenciador de serviços já está em execução")
+            logger.warning("Service manager is already running")
             return
             
         self.running = True
-        logger.info("Gerenciador de serviços iniciado")
+        logger.info("Service manager started")
         
-        # Inicia uma thread para cada serviço
+        # Start a thread for each service
         for name in self.services:
             thread = threading.Thread(target=self._run_service, args=(name,))
             thread.daemon = True
@@ -101,30 +101,30 @@ class ServiceManager:
             self.threads[name] = thread
 
     def stop(self):
-        """Para todos os serviços"""
+        """Stops all services"""
         if not self.running:
-            logger.warning("Gerenciador de serviços já está parado")
+            logger.warning("Service manager is already stopped")
             return
             
         self.running = False
-        logger.info("Parando gerenciador de serviços...")
+        logger.info("Stopping service manager...")
         
-        # Fecha todos os event loops
+        # Close all event loops
         for name, loop in self.loops.items():
             loop.close()
-            logger.info(f"Event loop do serviço '{name}' finalizado")
+            logger.info(f"Event loop for service '{name}' finished")
         
-        # Aguarda todas as threads terminarem
+        # Wait for all threads to finish
         for name, thread in self.threads.items():
             thread.join(timeout=5)
-            logger.info(f"Thread do serviço '{name}' finalizada")
+            logger.info(f"Thread for service '{name}' finished")
             
         self.threads.clear()
         self.loops.clear()
-        logger.info("Gerenciador de serviços parado")
+        logger.info("Service manager stopped")
 
     def get_service_status(self, name: str = None):
-        """Retorna o status de um serviço específico ou de todos os serviços."""
+        """Returns the status of a specific service or all services."""
         if name:
             if name in self.services:
                 service = self.services[name]
@@ -145,4 +145,4 @@ class ServiceManager:
                 'is_async': service['is_async']
             }
             for name, service in self.services.items()
-        } 
+        }
