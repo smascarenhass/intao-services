@@ -13,6 +13,12 @@ services:
       - DB_PASSWORD=meut1tbd0twk
       - DB_HOST=gfram1000.siteground.biz
       - DB_NAME=dblbufwzxkgog9
+      # Email Service Configuration
+      - SMTP_SERVER=email-smtp.eu-west-1.amazonaws.com
+      - SMTP_PORT=587
+      - SMTP_USERNAME=AKIAJAUQB2L4XF7ED2ZA
+      - SMTP_PASSWORD=AhNQRRqWikC2QWyGcY3lmeMwpFJncGqhQrwnfQCZ59bQ
+      - SENDER_EMAIL=support@intao.app
     volumes:
       - ./api:/app/api:delegated
       - ./requirements.txt:/app/requirements.txt:delegated

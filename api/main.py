@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import teams_routes, membership_pro_routes
+from .routes import teams_routes, membership_pro_routes, email_routes
 
 app = FastAPI(
     title="Intao Services API",
@@ -20,6 +20,7 @@ app.add_middleware(
 # Include routers
 app.include_router(teams_routes.router)
 app.include_router(membership_pro_routes.router)
+app.include_router(email_routes.router)
 
 @app.get("/")
 async def root():
