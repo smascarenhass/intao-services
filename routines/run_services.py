@@ -1,5 +1,5 @@
 from service_manager import ServiceManager
-from workers.sync_sparks_app_passwords import sync_sparks_app_passwords
+from workers.sync_membership_passwords_to_sparks import sync_membership_passwords_to_sparks
 import time
 import os
 import logging
@@ -17,8 +17,8 @@ def main():
 
     # Sync Membership Database a cada 1 hora
     manager.add_service(
-        name="sync_sparks_app_passwords",
-        function=sync_sparks_app_passwords,
+        name="sync_membership_passwords_to_sparks",
+        function=sync_membership_passwords_to_sparks,
         interval=3600  # 1 hora em segundos
     )
 

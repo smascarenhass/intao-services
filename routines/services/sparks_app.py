@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 from api.models.user import User
 from api.services.database import SessionLocal
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -55,26 +56,67 @@ class SparksAppService:
             logger.error(f"Erro ao verificar/criar coluna last_password_sync: {str(e)}")
             raise
 
-    def _normalize_password(self, password: str) -> str:
+    def _normalize_password_prefix(self, password: str) -> str:
         """
-        Normaliza a senha para comparação, removendo espaços em branco
-        e truncando para o tamanho máximo do banco de dados.
+        Normaliza o prefixo da senha WordPress para comparação.
+        Converte prefixos antigos ($P$) para o formato mais recente ($wp$).
+        
+        Args:
+            password: Senha hash do WordPress
+            
+        Returns:
+            Senha com prefixo normalizado
         """
         if not password:
             return ""
-        return password.strip()[:60]
+        
+        # Remove espaços e normaliza
+        password = password.strip()
+        
+        # Se a senha já tem o prefixo $wp$, mantém como está
+        if password.startswith('$wp$'):
+            return password
+        
+        # Se tem o prefixo antigo $P$, converte para $wp$
+        if password.startswith('$P$'):
+            # Remove o prefixo $P$ e adiciona $wp$
+            # O formato é: $P$[salt][hash] -> $wp$[salt][hash]
+            # Vamos assumir que o salt tem 8 caracteres (padrão do WordPress)
+            if len(password) > 12:  # $P$ + 8 chars salt + pelo menos 4 chars hash
+                salt = password[3:11]  # Extrai os 8 caracteres do salt
+                hash_part = password[11:]  # Resto é o hash
+                return f"$wp${salt}${hash_part}"
+        
+        # Se não tem prefixo conhecido, retorna como está
+        return password
+
+    def _normalize_password(self, password: str) -> str:
+        """
+        Normaliza a senha para comparação, removendo espaços em branco,
+        truncando para o tamanho máximo do banco de dados e normalizando prefixos.
+        """
+        if not password:
+            return ""
+        
+        # Primeiro normaliza o prefixo
+        normalized = self._normalize_password_prefix(password)
+        
+        # Depois trunca para o tamanho máximo
+        return normalized[:60]
 
     def _passwords_match(self, membership_pass: str, sparks_pass: str) -> bool:
         """
-        Compara as senhas de forma normalizada.
+        Compara as senhas de forma normalizada, considerando diferentes prefixos WordPress.
         """
         normalized_membership = self._normalize_password(membership_pass)
         normalized_sparks = self._normalize_password(sparks_pass)
         
         # Log para debug
         logger.debug(f"Comparando senhas:")
-        logger.debug(f"Membership (normalizada): {normalized_membership[:10]}...")
-        logger.debug(f"Sparks (normalizada): {normalized_sparks[:10]}...")
+        logger.debug(f"Membership (original): {membership_pass[:15]}...")
+        logger.debug(f"Sparks (original): {sparks_pass[:15]}...")
+        logger.debug(f"Membership (normalizada): {normalized_membership[:15]}...")
+        logger.debug(f"Sparks (normalizada): {normalized_sparks[:15]}...")
         
         return normalized_membership == normalized_sparks
         
@@ -94,14 +136,14 @@ class SparksAppService:
         try:
             logger.info("Executing query to get all users from Sparks App database...")
             query = text("""
-                SELECT id, email, password, last_password_sync
-                FROM users 
+                SELECT id, email, password, first_name, last_name, last_password_sync
+                FROM users
                 WHERE email IS NOT NULL
             """)
             print("\n=== QUERY EXECUTADA ===")
             print(query.text)
             print("======================\n")
-            
+
             result = self.sparks_session.execute(query)
             users = []
             for row in result:
@@ -109,7 +151,9 @@ class SparksAppService:
                     'id': row[0],
                     'email': row[1].lower() if row[1] else None,  # Normaliza email para lowercase
                     'password': row[2],
-                    'last_password_sync': row[3]
+                    'first_name': row[3],
+                    'last_name': row[4],
+                    'last_password_sync': row[5]
                 })
             logger.info(f"Successfully retrieved {len(users)} users from Sparks App database")
             return users
