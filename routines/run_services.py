@@ -4,7 +4,7 @@ import time
 import os
 import logging
 
-# Configuração do logging
+# Logging configuration
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -12,32 +12,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def main():
-    # Criando uma instância do gerenciador de serviços
+    # Create a service manager instance
     manager = ServiceManager()
 
-    # Sync Membership Database a cada 1 hora
+    # Sync Membership passwords every minute
     manager.add_service(
         name="sync_membership_passwords_to_sparks",
         function=sync_membership_passwords_to_sparks,
-        interval=3600  # 1 hora em segundos
+        interval=60  # 1 minute in seconds (sufficient for less than 250 users, without stressing the databases)
     )
 
-    # Iniciando o gerenciador de serviços
-    logger.info("Iniciando gerenciador de serviços...")
+    # Start the service manager
+    logger.info("Starting service manager...")
     manager.start()
 
     try:
-        # Mantém o programa rodando
+        # Keep the program running
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        logger.info("Parando gerenciador de serviços...")
+        logger.info("Stopping service manager...")
         manager.stop()
-        logger.info("Gerenciador de serviços parado.")
+        logger.info("Service manager stopped.")
     except Exception as e:
-        logger.error(f"Erro inesperado: {str(e)}")
+        logger.error(f"Unexpected error: {str(e)}")
         manager.stop()
         raise
 
 if __name__ == "__main__":
-    main() 
+    main()

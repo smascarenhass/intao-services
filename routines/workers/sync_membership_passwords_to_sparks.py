@@ -3,6 +3,7 @@ from datetime import datetime
 import asyncio
 import os
 import sys
+import time  # <-- Adicionado para medir tempo de execução
 
 # Add project root to Python path
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
@@ -24,10 +25,13 @@ async def sync_membership_passwords_to_sparks():
     """
     Service that synchronizes passwords from Membership Pro to Sparks App.
     For each user present in both systems, ensures the password in Sparks App matches the Membership Pro password.
+    Logs execution time and number of updated passwords for monitoring.
     """
     try:
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         main_logger.info(f"Starting password synchronization (Membership → Sparks) at {current_time}")
+
+        start_time = time.time()  # <-- Início da medição
 
         # Initialize services
         db = SessionLocal()
@@ -57,9 +61,15 @@ async def sync_membership_passwords_to_sparks():
                 main_logger.info(f"{k}: {v}")
             main_logger.info("="*80 + "\n")
 
+            # Log de performance
+            updated = stats.get('updated_passwords', 0)
+            main_logger.info(f"🔄 Passwords updated in this run: {updated}")
+
         finally:
             db.close()
 
+        elapsed = time.time() - start_time
+        main_logger.info(f"⏱️ Sync execution time: {elapsed:.2f} seconds")
         main_logger.info("Password synchronization (Membership → Sparks) completed successfully")
 
     except Exception as e:
